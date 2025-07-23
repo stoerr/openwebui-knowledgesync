@@ -1,0 +1,179 @@
+[
+  {
+    "id": "b7d58668-8f5f-488b-ac0a-b57fa62f7aad",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "45b75461ba1a50daec1f31d1faf94b456e004b208fea484dc87c93c96e4928f7",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto."
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "a836f4b9-2ce6-4d30-bd28-ebd56c59eab3"
+    },
+    "created_at": 1753162588,
+    "updated_at": 1753162588
+  },
+  {
+    "id": "0f37e7f8-3f35-4a97-8e27-891a16fc1e66",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "file-0f37e7f8-3f35-4a97-8e27-891a16fc1e66"
+    },
+    "created_at": 1753163212,
+    "updated_at": 1753163212
+  },
+  {
+    "id": "8100ba1a-6cf5-446c-9451-8d009cfc7d7b",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "file-8100ba1a-6cf5-446c-9451-8d009cfc7d7b"
+    },
+    "created_at": 1753163214,
+    "updated_at": 1753163214
+  },
+  {
+    "id": "2ec72510-cfc3-4d5c-babf-a30bd4d9d976",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "file-2ec72510-cfc3-4d5c-babf-a30bd4d9d976"
+    },
+    "created_at": 1753170693,
+    "updated_at": 1753170693
+  },
+  {
+    "id": "57080d3b-d3e3-4fdb-adb8-2226e6d704ce",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "file-57080d3b-d3e3-4fdb-adb8-2226e6d704ce"
+    },
+    "created_at": 1753214964,
+    "updated_at": 1753214964
+  },
+  {
+    "id": "34a0e1c9-5786-4d3d-a2fb-5c6cb351b0e6",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 32,
+      "data": {},
+      "collection_name": "file-34a0e1c9-5786-4d3d-a2fb-5c6cb351b0e6"
+    },
+    "created_at": 1753214967,
+    "updated_at": 1753214967
+  },
+  {
+    "id": "e458b6a9-8bc3-4273-91df-1d85a1d465b8",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "ad06c71227e1abc978387e98b3af4739bade2b0735ca1764432aa166f383a79e",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses blaues Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 39,
+      "data": {},
+      "collection_name": "file-e458b6a9-8bc3-4273-91df-1d85a1d465b8"
+    },
+    "created_at": 1753215021,
+    "updated_at": 1753215021
+  },
+  {
+    "id": "1a4ec8dd-e0b2-4cb3-8759-3aff60aa95ab",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "ad06c71227e1abc978387e98b3af4739bade2b0735ca1764432aa166f383a79e",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses blaues Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 39,
+      "data": {},
+      "collection_name": "file-1a4ec8dd-e0b2-4cb3-8759-3aff60aa95ab"
+    },
+    "created_at": 1753246840,
+    "updated_at": 1753246840
+  },
+  {
+    "id": "0bb1a03f-1967-4453-9417-7d629e0223db",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "ad06c71227e1abc978387e98b3af4739bade2b0735ca1764432aa166f383a79e",
+    "filename": "knowledgetest.txt",
+    "data": {
+      "content": "Ein Hubbu ist ein grosses blaues Auto.\n"
+    },
+    "meta": {
+      "name": "knowledgetest.txt",
+      "content_type": "text/plain",
+      "size": 39,
+      "data": {},
+      "collection_name": "file-0bb1a03f-1967-4453-9417-7d629e0223db"
+    },
+    "created_at": 1753246846,
+    "updated_at": 1753246846
+  },
+  {
+    "id": "38010eba-eb5d-44cf-808f-6da56a615dba",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": null,
+    "filename": "custom_name.pdf",
+    "data": {},
+    "meta": {
+      "name": "custom_name.pdf",
+      "content_type": "application/pdf",
+      "size": 39,
+      "data": {}
+    },
+    "created_at": 1753246863,
+    "updated_at": 1753246863
+  }
+]

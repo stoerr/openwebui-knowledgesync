@@ -9,3 +9,5 @@ open-webui-api-key=<api_key>
 open_webui_api_url=http://localhost:3000
 ```
 - The script will read the current content of the knowledge base and compare it with the files in the directory. If files are not there anymore or have been changed, they will be deleted. Whether the file content is checked with sha256
+- The implementation is plain node.js without additional dependencies. No external libraries have to be installed.
+- 

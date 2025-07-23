@@ -4,6 +4,9 @@
 function usage() {
     console.log('Usage: open-webui-knowledgesync [command]');
     console.log('Commands:');
+    console.log('  sync         Performs the synchronization of the configured knowledge base with the current directory.');
+    console.log('               All files in the knowledge base that do not correspond to files in the current directory will be deleted.');
+    console.log('               All files in the current directory will be uploaded / changed if needed.');
     console.log('  listkb       List knowledge bases');
     console.log('  listfiles    List all files');
     console.log('  listkbfiles  List files in a knowledge base');
@@ -40,7 +43,13 @@ const openWebuiApiKey = config.open_webui_api_key;
 const openWebuiApiUrl = config.open_webui_api_url || 'http://localhost:3000';
 
 // call functions based on command
-if (command === 'listkb') {
+if (command === 'sync') {
+    if (!knowledgeBaseId) {
+        console.error('Knowledge base ID is required for sync command.');
+        process.exit(1);
+    }
+    syncKnowledgeBase();
+} else if (command === 'listkb') {
     listKnowledgeBases();
 } else if (command === 'listfiles') {
     listFiles();
@@ -56,5 +65,53 @@ if (command === 'listkb') {
 }
 
 function listKnowledgeBases() {
+  httpGet('/api/v1/knowledge/');
+}
 
+function listFiles() {
+  httpGet('/api/v1/files/');
+}
+
+function listFilesInKnowledgeBase(id) {
+  httpGet(`/api/v1/knowledge/${id}`);
+}
+
+function httpGet(path) {
+  const { URL } = require('url');
+  const url = new URL(path, openWebuiApiUrl);
+  const lib = url.protocol === 'https:' ? require('https') : require('http');
+  const options = {
+    hostname: url.hostname,
+    port:     url.port,
+    path:     url.pathname + url.search,
+    method:   'GET',
+    headers: {
+      'Authorization': `Bearer ${openWebuiApiKey}`,
+      'Accept':        'application/json'
+    }
+  };
+
+  const req = lib.request(options, res => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try {
+        const json = JSON.parse(data);
+        console.log(JSON.stringify(json, null, 2));
+      } catch (err) {
+        console.error('Invalid JSON response:', err.message);
+        console.log(data);
+      }
+    });
+  });
+
+  req.on('error', err => {
+    console.error('Request error:', err.message);
+  });
+
+  req.end();
+}
+
+function syncKnowledgeBase() {
+    // TODO
 }

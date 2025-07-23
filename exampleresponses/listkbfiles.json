@@ -1,0 +1,29 @@
+{
+  "id": "a836f4b9-2ce6-4d30-bd28-ebd56c59eab3",
+  "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+  "name": "testknowledge",
+  "description": "test working with knowledge",
+  "data": {
+    "file_ids": [
+      "b7d58668-8f5f-488b-ac0a-b57fa62f7aad"
+    ]
+  },
+  "meta": null,
+  "access_control": null,
+  "created_at": 1753127761,
+  "updated_at": 1753214984,
+  "files": [
+    {
+      "id": "b7d58668-8f5f-488b-ac0a-b57fa62f7aad",
+      "meta": {
+        "name": "knowledgetest.txt",
+        "content_type": "text/plain",
+        "size": 32,
+        "data": {},
+        "collection_name": "a836f4b9-2ce6-4d30-bd28-ebd56c59eab3"
+      },
+      "created_at": 1753162588,
+      "updated_at": 1753162588
+    }
+  ]
+}
