@@ -19,9 +19,75 @@ function usage() {
     console.log('  listkbfiles  List files in a knowledge base');
 }
 
-// Helper: get all non-dot files recursively (excluding config and script)
-function getLocalFiles(dir = process.cwd(), relativePath = '') {
+// Helper: parse gitignore file and return array of patterns
+function parseGitignore(gitignorePath) {
+    if (!fs.existsSync(gitignorePath)) {
+        return [];
+    }
+    const content = fs.readFileSync(gitignorePath, 'utf8');
+    return content
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(pattern => {
+            // Convert gitignore pattern to regex-like matching
+            // Simple implementation - can be enhanced for more complex patterns
+            if (pattern.endsWith('/')) {
+                // Directory pattern
+                return { pattern: pattern.slice(0, -1), isDirectory: true };
+            } else {
+                // File or directory pattern
+                return { pattern: pattern, isDirectory: false };
+            }
+        });
+}
+
+// Helper: check if a path matches gitignore patterns
+function isIgnored(filePath, gitignorePatterns) {
+    const pathParts = filePath.split(path.sep);
+
+    for (const rule of gitignorePatterns) {
+        const pattern = rule.pattern;
+
+        // Simple pattern matching - exact match or ends with pattern
+        if (pattern.includes('*')) {
+            // Basic wildcard support
+            const regexPattern = pattern
+                .replace(/\./g, '\\.')
+                .replace(/\*/g, '.*');
+            const regex = new RegExp(`^${regexPattern}$`);
+
+            if (regex.test(filePath) || pathParts.some(part => regex.test(part))) {
+                return true;
+            }
+        } else {
+            // Exact match
+            if (filePath === pattern ||
+                filePath.endsWith('/' + pattern) ||
+                pathParts.includes(pattern)) {
+                return true;
+            }
+
+            // Directory pattern - check if any parent directory matches
+            if (rule.isDirectory && pathParts.includes(pattern)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// Helper: get all non-dot files recursively (excluding config, script, and gitignored files)
+function getLocalFiles(dir = process.cwd(), relativePath = '', gitignorePatterns = null) {
     const files = [];
+
+    // Load gitignore patterns from current directory if not provided
+    if (gitignorePatterns === null) {
+        const gitignorePath = path.join(process.cwd(), '.gitignore');
+        gitignorePatterns = parseGitignore(gitignorePath);
+    }
+
     const entries = fs.readdirSync(dir);
 
     for (const entry of entries) {
@@ -35,9 +101,14 @@ function getLocalFiles(dir = process.cwd(), relativePath = '') {
             continue;
         }
 
+        // Skip gitignored files
+        if (isIgnored(relativeFilePath, gitignorePatterns)) {
+            continue;
+        }
+
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-            files.push(...getLocalFiles(fullPath, relativeFilePath));
+            files.push(...getLocalFiles(fullPath, relativeFilePath, gitignorePatterns));
         } else if (stat.isFile()) {
             files.push(relativeFilePath);
         }
@@ -241,13 +312,13 @@ async function syncKnowledgeBase() {
             if (localHash !== remoteHash) {
                 console.log(`Uploading file: ${filename}`);
                 const uploadResult = await uploadFile(filename, kbdirId);
-                console.log(`File uploaded: ${JSON.stringify(uploadResult, null, 2)}`);
+                // console.log(`File uploaded: ${JSON.stringify(uploadResult, null, 2)}`);
 
                 console.log(`Adding file to knowledge base: ${filename}`);
                 await httpRequest('POST', `/api/v1/knowledge/${knowledgeBaseId}/file/add`, {
                     file_id: uploadResult.id
                 }).then(
-                    (m) => console.log(`File added to knowledge base: ${filename} , ${JSON.stringify(m, null, 2)}`),
+                    (m) => true /* console.log(`File added to knowledge base: ${filename} , ${JSON.stringify(m, null, 2)}`) */,
                     err => console.error(`Failed to add file to knowledge base: ${filename}`, err.message)
                 );
             } else {
@@ -273,12 +344,6 @@ async function syncKnowledgeBase() {
         }
 
         console.log('Synchronization completed successfully!');
-
-        // 6. Show final state
-        const finalKbData = await httpRequest('GET', `/api/v1/knowledge/${knowledgeBaseId}`);
-        console.log('Final knowledge base state:');
-        console.log(JSON.stringify(finalKbData, null, 2));
-
     } catch (error) {
         console.error('Synchronization failed:', error.message || error);
         process.exit(1);

@@ -20,3 +20,4 @@ kbdir_id=<identifiert for directory>
   kbdir_id is put in front of the file path to support multiple directories. E.g. foo/bar/baz.txt will be encoded as
   kbdir_id%%foo%%bar%%baz.txt where kbdir_id is the identifier for the directory from the configuration file.
 - Files starting with . are ignored.
+- If a .gitignore file exists in the root directory, files and directories matching gitignore patterns are excluded from synchronization.
