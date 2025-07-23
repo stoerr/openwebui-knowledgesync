@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+
+/* Prints usage: commands are listkb, listfiles */
+function usage() {
+    console.log('Usage: open-webui-knowledgesync [command]');
+    console.log('Commands:');
+    console.log('  listkb       List knowledge bases');
+    console.log('  listfiles    List all files');
+    console.log('  listkbfiles  List files in a knowledge base');
+}
+
+const fs = require('fs');
+const path = require('path');
+
+const args = process.argv.slice(2);
+if (args.length === 0) {
+    usage();
+    process.exit(1);
+}
+const command = args[0];
+
+const configPath = path.join(__dirname, '.open-webui-knowledgesync');
+if (!fs.existsSync(configPath)) {
+    console.error('Configuration file not found:', configPath);
+    process.exit(1);
+}
+const config = fs.readFileSync(configPath, 'utf8').trim().split('\n').reduce((acc, line) => {
+    const [key, value] = line.split('=');
+    acc[key.trim()] = value.trim();
+    return acc;
+}, {});
+
+if (!config.open_webui_api_key) {
+    console.error('Missing required configuration: knowledge_base_id or open_webui_api_key');
+    process.exit(1);
+}
+
+const knowledgeBaseId = config.knowledge_base_id;
+const openWebuiApiKey = config.open_webui_api_key;
+const openWebuiApiUrl = config.open_webui_api_url || 'http://localhost:3000';
+
+// call functions based on command
+if (command === 'listkb') {
+    listKnowledgeBases();
+} else if (command === 'listfiles') {
+    listFiles();
+} else if (command === 'listkbfiles') {
+    if (!knowledgeBaseId) {
+        console.error('Knowledge base ID is required for this command.');
+        process.exit(1);
+    }
+    listFilesInKnowledgeBase(knowledgeBaseId);
+} else {
+    usage();
+    process.exit(1);
+}
+
+function listKnowledgeBases() {
+
+}
