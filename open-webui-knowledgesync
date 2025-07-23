@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { URL } = require('url');
+const http = require('http');
+const https = require('https');
+
 /* Prints usage: commands are listkb, listfiles */
 function usage() {
     console.log('Usage: open-webui-knowledgesync [command]');
@@ -12,9 +19,261 @@ function usage() {
     console.log('  listkbfiles  List files in a knowledge base');
 }
 
-const fs = require('fs');
-const path = require('path');
+// Helper: get all non-dot files recursively (excluding config and script)
+function getLocalFiles(dir = process.cwd(), relativePath = '') {
+    const files = [];
+    const entries = fs.readdirSync(dir);
 
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        const relativeFilePath = relativePath ? path.join(relativePath, entry) : entry;
+
+        // Skip dot files, config file, and script file
+        if (entry.startsWith('.') ||
+            fullPath === path.join(process.cwd(), path.basename(__filename)) ||
+            fullPath === configPath) {
+            continue;
+        }
+
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+            files.push(...getLocalFiles(fullPath, relativeFilePath));
+        } else if (stat.isFile()) {
+            files.push(relativeFilePath);
+        }
+    }
+
+    return files;
+}
+
+// Helper: compute SHA256 hash of file
+function fileHash(filename) {
+    const data = fs.readFileSync(filename);
+    return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+// Helper: make HTTP request returning JSON
+function httpRequest(method, apiPath, body = null, contentType = 'application/json') {
+    return new Promise((resolve, reject) => {
+        const url = new URL(apiPath, openWebuiApiUrl);
+        const lib = url.protocol === 'https:' ? https : http;
+        const headers = {
+            'Authorization': `Bearer ${openWebuiApiKey}`,
+            'Accept': 'application/json'
+        };
+
+        if (contentType) headers['Content-Type'] = contentType;
+        if (body && contentType === 'application/json') {
+            body = JSON.stringify(body);
+            headers['Content-Length'] = Buffer.byteLength(body);
+        }
+
+        const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method: method,
+            headers: headers
+        };
+
+        const req = lib.request(options, res => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    resolve(data);
+                }
+            });
+        });
+
+        req.on('error', reject);
+        if (body) req.write(body);
+        req.end();
+    });
+}
+
+// Helper: encode filename with kbdir_id prefix and %% separators
+function encodeFilename(filename, kbdirId) {
+    const encodedPath = filename.replace(/[/\\]/g, '%%');
+    return `${kbdirId}%%${encodedPath}`;
+}
+
+// Helper: decode filename from OpenWebUI format and check if it belongs to our kbdir_id
+function decodeFilename(encodedName, kbdirId) {
+    const prefix = `${kbdirId}%%`;
+    if (!encodedName.startsWith(prefix)) {
+        return null; // Not from our directory
+    }
+    return encodedName.substring(prefix.length).replace(/%%/g, '/');
+}
+
+// Helper: upload file using multipart form data
+function uploadFile(filename, kbdirId) {
+    return new Promise((resolve, reject) => {
+        const boundary = '----WebKitFormBoundary' + Math.random().toString(16).slice(2);
+        const url = new URL('/api/v1/files/', openWebuiApiUrl);
+        const lib = url.protocol === 'https:' ? https : http;
+        const fileContent = fs.readFileSync(filename);
+
+        // Encode filename with kbdir_id prefix
+        const encodedFilename = encodeFilename(filename, kbdirId);
+
+        const payloadStart = Buffer.from(
+            `--${boundary}\n` +
+            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\n` +
+            `Content-Type: application/octet-stream\n\n`
+        );
+        const payloadEnd = Buffer.from(`\n--${boundary}--\n`);
+        const contentLength = payloadStart.length + fileContent.length + payloadEnd.length;
+
+        const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname,
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openWebuiApiKey}`,
+                'Accept': 'application/json',
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': contentLength
+            }
+        };
+
+        const req = lib.request(options, res => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        req.on('error', reject);
+        req.write(payloadStart);
+        req.write(fileContent);
+        req.write(payloadEnd);
+        req.end();
+    });
+}
+
+function listKnowledgeBases() {
+    httpRequest('GET', '/api/v1/knowledge/')
+        .then(json => console.log(JSON.stringify(json, null, 2)))
+        .catch(err => console.error('Request error:', err.message));
+}
+
+function listFiles() {
+    httpRequest('GET', '/api/v1/files/')
+        .then(json => console.log(JSON.stringify(json, null, 2)))
+        .catch(err => console.error('Request error:', err.message));
+}
+
+function listFilesInKnowledgeBase(id) {
+    httpRequest('GET', `/api/v1/knowledge/${id}`)
+        .then(json => console.log(JSON.stringify(json, null, 2)))
+        .catch(err => console.error('Request error:', err.message));
+}
+
+async function syncKnowledgeBase() {
+    try {
+        console.log('Starting knowledge base synchronization...');
+
+        // 1. Get local files and their hashes
+        const localFiles = getLocalFiles();
+        const localHashes = {};
+        for (const filename of localFiles) {
+            localHashes[filename] = fileHash(filename);
+        }
+        console.log(`Found ${localFiles.length} local files`);
+
+        // 2. Get current knowledge base state
+        const kbData = await httpRequest('GET', `/api/v1/knowledge/${knowledgeBaseId}`);
+        const kbFiles = kbData.files || [];
+        console.log(`Knowledge base contains ${kbFiles.length} files`);
+
+        // 3. Get all files to find hash information - only consider files from our kbdir_id
+        const allFiles = await httpRequest('GET', '/api/v1/files/');
+        const fileHashMap = {};
+        for (const file of allFiles) {
+            if (file.hash) {
+                // Decode filename and check if it belongs to our directory
+                const decodedName = decodeFilename(file.meta.name, kbdirId);
+                if (decodedName !== null) {
+                    fileHashMap[decodedName] = file.hash;
+                }
+            }
+        }
+
+        // 4. Delete files from KB that don't exist locally or have different hashes
+        for (const kbFile of kbFiles) {
+            // Decode filename and check if it belongs to our directory
+            const filename = decodeFilename(kbFile.meta.name, kbdirId);
+            if (filename !== null) {
+                const remoteHash = fileHashMap[filename];
+                const localHash = localHashes[filename];
+
+                if (!localHash || localHash !== remoteHash) {
+                    console.log(`Deleting file from knowledge base: ${filename}`);
+                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
+                }
+            }
+        }
+
+        // 5. Upload and add new/changed files
+        for (const filename of localFiles) {
+            const localHash = localHashes[filename];
+            const remoteHash = fileHashMap[filename];
+
+            // Check if file needs to be uploaded
+            if (localHash !== remoteHash) {
+                console.log(`Uploading file: ${filename}`);
+                const uploadResult = await uploadFile(filename, kbdirId);
+
+                console.log(`Adding file to knowledge base: ${filename}`);
+                await httpRequest('POST', `/api/v1/knowledge/${knowledgeBaseId}/file/add`, {
+                    file_id: uploadResult.id
+                });
+            } else {
+                // File exists with same hash - check if it's in the knowledge base
+                const inKb = kbFiles.some(f => {
+                    const decodedName = decodeFilename(f.meta.name, kbdirId);
+                    return decodedName === filename;
+                });
+                if (!inKb) {
+                    // Find existing file and add to KB
+                    const existingFile = allFiles.find(f => {
+                        const decodedName = decodeFilename(f.meta.name, kbdirId);
+                        return decodedName === filename && f.hash === localHash;
+                    });
+                    if (existingFile) {
+                        console.log(`Adding existing file to knowledge base: ${filename}`);
+                        await httpRequest('POST', `/api/v1/knowledge/${knowledgeBaseId}/file/add`, {
+                            file_id: existingFile.id
+                        });
+                    }
+                }
+            }
+        }
+
+        console.log('Synchronization completed successfully!');
+
+        // 6. Show final state
+        const finalKbData = await httpRequest('GET', `/api/v1/knowledge/${knowledgeBaseId}`);
+        console.log('Final knowledge base state:');
+        console.log(JSON.stringify(finalKbData, null, 2));
+
+    } catch (error) {
+        console.error('Synchronization failed:', error.message || error);
+        process.exit(1);
+    }
+}
+
+// Main execution
 const args = process.argv.slice(2);
 if (args.length === 0) {
     usage();
@@ -22,7 +281,7 @@ if (args.length === 0) {
 }
 const command = args[0];
 
-const configPath = path.join(__dirname, '.open-webui-knowledgesync');
+const configPath = path.join(process.cwd(), '.open-webui-knowledgesync');
 if (!fs.existsSync(configPath)) {
     console.error('Configuration file not found:', configPath);
     process.exit(1);
@@ -34,18 +293,23 @@ const config = fs.readFileSync(configPath, 'utf8').trim().split('\n').reduce((ac
 }, {});
 
 if (!config.open_webui_api_key) {
-    console.error('Missing required configuration: knowledge_base_id or open_webui_api_key');
+    console.error('Missing required configuration: open_webui_api_key');
     process.exit(1);
 }
 
 const knowledgeBaseId = config.knowledge_base_id;
 const openWebuiApiKey = config.open_webui_api_key;
 const openWebuiApiUrl = config.open_webui_api_url || 'http://localhost:3000';
+const kbdirId = config.kbdir_id;
 
 // call functions based on command
 if (command === 'sync') {
     if (!knowledgeBaseId) {
         console.error('Knowledge base ID is required for sync command.');
+        process.exit(1);
+    }
+    if (!kbdirId) {
+        console.error('kbdir_id is required for sync command.');
         process.exit(1);
     }
     syncKnowledgeBase();
@@ -62,56 +326,4 @@ if (command === 'sync') {
 } else {
     usage();
     process.exit(1);
-}
-
-function listKnowledgeBases() {
-  httpGet('/api/v1/knowledge/');
-}
-
-function listFiles() {
-  httpGet('/api/v1/files/');
-}
-
-function listFilesInKnowledgeBase(id) {
-  httpGet(`/api/v1/knowledge/${id}`);
-}
-
-function httpGet(path) {
-  const { URL } = require('url');
-  const url = new URL(path, openWebuiApiUrl);
-  const lib = url.protocol === 'https:' ? require('https') : require('http');
-  const options = {
-    hostname: url.hostname,
-    port:     url.port,
-    path:     url.pathname + url.search,
-    method:   'GET',
-    headers: {
-      'Authorization': `Bearer ${openWebuiApiKey}`,
-      'Accept':        'application/json'
-    }
-  };
-
-  const req = lib.request(options, res => {
-    let data = '';
-    res.on('data', chunk => data += chunk);
-    res.on('end', () => {
-      try {
-        const json = JSON.parse(data);
-        console.log(JSON.stringify(json, null, 2));
-      } catch (err) {
-        console.error('Invalid JSON response:', err.message);
-        console.log(data);
-      }
-    });
-  });
-
-  req.on('error', err => {
-    console.error('Request error:', err.message);
-  });
-
-  req.end();
-}
-
-function syncKnowledgeBase() {
-    // TODO
 }
