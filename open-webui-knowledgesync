@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { URL } = require('url');
+const {URL} = require('url');
 const http = require('http');
 const https = require('https');
 
@@ -121,11 +121,11 @@ function uploadFile(filename, kbdirId) {
         const encodedFilename = encodeFilename(filename, kbdirId);
 
         const payloadStart = Buffer.from(
-            `--${boundary}\n` +
-            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\n` +
-            `Content-Type: application/octet-stream\n\n`
+            `--${boundary}\r\n` +
+            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\n` +
+            `Content-Type: application/octet-stream\r\n\r\n`
         );
-        const payloadEnd = Buffer.from(`\n--${boundary}--\n`);
+        const payloadEnd = Buffer.from(`\r\n--${boundary}--\r\n`);
         const contentLength = payloadStart.length + fileContent.length + payloadEnd.length;
 
         const options = {
@@ -209,19 +209,27 @@ async function syncKnowledgeBase() {
             }
         }
 
-        // 4. Delete files from KB that don't exist locally or have different hashes
+        // 4. Delete files from KB that belong to our kbdir_id but don't exist locally or have different hashes
         for (const kbFile of kbFiles) {
             // Decode filename and check if it belongs to our directory
             const filename = decodeFilename(kbFile.meta.name, kbdirId);
             if (filename !== null) {
-                const remoteHash = fileHashMap[filename];
+                // This file belongs to our directory
                 const localHash = localHashes[filename];
+                const remoteHash = fileHashMap[filename];
 
-                if (!localHash || localHash !== remoteHash) {
-                    console.log(`Deleting file from knowledge base: ${filename}`);
+                if (!localHash) {
+                    // File doesn't exist locally anymore - delete it
+                    console.log(`Deleting file from knowledge base (no longer exists locally): ${filename}`);
+                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
+                } else if (localHash !== remoteHash) {
+                    // File exists but has different hash - delete old version
+                    console.log(`Deleting file from knowledge base (content changed): ${filename}`);
                     await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
                 }
+                // If localHash === remoteHash, file is up to date, keep it
             }
+            // If filename is null, this file doesn't belong to our directory, leave it alone
         }
 
         // 5. Upload and add new/changed files
@@ -233,11 +241,15 @@ async function syncKnowledgeBase() {
             if (localHash !== remoteHash) {
                 console.log(`Uploading file: ${filename}`);
                 const uploadResult = await uploadFile(filename, kbdirId);
+                console.log(`File uploaded: ${JSON.stringify(uploadResult, null, 2)}`);
 
                 console.log(`Adding file to knowledge base: ${filename}`);
                 await httpRequest('POST', `/api/v1/knowledge/${knowledgeBaseId}/file/add`, {
                     file_id: uploadResult.id
-                });
+                }).then(
+                    (m) => console.log(`File added to knowledge base: ${filename} , ${JSON.stringify(m, null, 2)}`),
+                    err => console.error(`Failed to add file to knowledge base: ${filename}`, err.message)
+                );
             } else {
                 // File exists with same hash - check if it's in the knowledge base
                 const inKb = kbFiles.some(f => {
