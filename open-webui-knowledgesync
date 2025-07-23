@@ -193,8 +193,7 @@ function uploadFile(filename, kbdirId) {
 
         const payloadStart = Buffer.from(
             `--${boundary}\r\n` +
-            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\n` +
-            `Content-Type: application/octet-stream\r\n\r\n`
+            `Content-Disposition: form-data; name="file"; filename="${encodedFilename}"\r\n\r\n`
         );
         const payloadEnd = Buffer.from(`\r\n--${boundary}--\r\n`);
         const contentLength = payloadStart.length + fileContent.length + payloadEnd.length;
@@ -234,7 +233,14 @@ function uploadFile(filename, kbdirId) {
 
 function listKnowledgeBases() {
     httpRequest('GET', '/api/v1/knowledge/')
-        .then(json => console.log(JSON.stringify(json, null, 2)))
+        .then(json => {
+            const simplified = json.map(kb => ({
+                id: kb.id,
+                name: kb.name,
+                description: kb.description
+            }));
+            console.log(JSON.stringify(simplified, null, 2));
+        })
         .catch(err => console.error('Request error:', err.message));
 }
 
