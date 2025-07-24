@@ -231,24 +231,6 @@ function uploadFile(filename, kbdirId) {
     });
 }
 
-// Helper: remove file from knowledge base (first from collection, then from storage)
-async function removeFileFromKnowledgeBase(fileId) {
-    try {
-        // First remove from knowledge collection
-        console.log(`Removing file ${fileId} from knowledge collection...`);
-        const removeUrl = `/api/v1/knowledge/${knowledgeBaseId}/file/remove`;
-        await httpRequest('POST', removeUrl, { 'file_id': fileId });
-
-        // Then delete from file storage
-        console.log(`Deleting file ${fileId} from file storage...`);
-        const deleteUrl = `/api/v1/files/${fileId}`;
-        await httpRequest('DELETE', deleteUrl);
-    } catch (error) {
-        console.error(`Error deleting file ${fileId}:`, error.message);
-        throw error;
-    }
-}
-
 function listKnowledgeBases() {
     httpRequest('GET', '/api/v1/knowledge/')
         .then(json => {
@@ -322,11 +304,11 @@ async function syncKnowledgeBase() {
                 if (!localHash) {
                     // File doesn't exist locally anymore - delete it
                     console.log(`Deleting file from knowledge base (no longer exists locally): ${filename}`);
-                    await removeFileFromKnowledgeBase(kbFile.id);
+                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
                 } else if (localHash !== remoteHash) {
                     // File exists but has different hash - delete old version
                     console.log(`Deleting file from knowledge base (content changed): ${filename}`);
-                    await removeFileFromKnowledgeBase(kbFile.id);
+                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
                 }
                 // If localHash === remoteHash, file is up to date, keep it
             }
