@@ -7,9 +7,11 @@ const {URL} = require('url');
 const http = require('http');
 const https = require('https');
 
+const debug = true; // Set to true for debug output
+
 /* Prints usage: commands are listkb, listfiles */
 function usage() {
-    console.log('Usage: open-webui-knowledgesync [command]');
+    console.log('Usage: openwebui-knowledgesync [command]');
     console.log('Commands:');
     console.log('  sync         Performs the synchronization of the configured knowledge base with the current directory.');
     console.log('               All files in the knowledge base that do not correspond to files in the current directory will be deleted.');
@@ -19,74 +21,12 @@ function usage() {
     console.log('  listkbfiles  List files in a knowledge base');
 }
 
-// Helper: parse gitignore file and return array of patterns
-function parseGitignore(gitignorePath) {
-    if (!fs.existsSync(gitignorePath)) {
-        return [];
-    }
-    const content = fs.readFileSync(gitignorePath, 'utf8');
-    return content
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('#'))
-        .map(pattern => {
-            // Convert gitignore pattern to regex-like matching
-            // Simple implementation - can be enhanced for more complex patterns
-            if (pattern.endsWith('/')) {
-                // Directory pattern
-                return { pattern: pattern.slice(0, -1), isDirectory: true };
-            } else {
-                // File or directory pattern
-                return { pattern: pattern, isDirectory: false };
-            }
-        });
-}
-
-// Helper: check if a path matches gitignore patterns
-function isIgnored(filePath, gitignorePatterns) {
-    const pathParts = filePath.split(path.sep);
-
-    for (const rule of gitignorePatterns) {
-        const pattern = rule.pattern;
-
-        // Simple pattern matching - exact match or ends with pattern
-        if (pattern.includes('*')) {
-            // Basic wildcard support
-            const regexPattern = pattern
-                .replace(/\./g, '\\.')
-                .replace(/\*/g, '.*');
-            const regex = new RegExp(`^${regexPattern}$`);
-
-            if (regex.test(filePath) || pathParts.some(part => regex.test(part))) {
-                return true;
-            }
-        } else {
-            // Exact match
-            if (filePath === pattern ||
-                filePath.endsWith('/' + pattern) ||
-                pathParts.includes(pattern)) {
-                return true;
-            }
-
-            // Directory pattern - check if any parent directory matches
-            if (rule.isDirectory && pathParts.includes(pattern)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// Helper: get all non-dot files recursively (excluding config, script, and gitignored files)
-function getLocalFiles(dir = process.cwd(), relativePath = '', gitignorePatterns = null) {
+// Helper: get all files matching fileregex recursively (excluding config, script)
+function getLocalFiles(dir = process.cwd(), relativePath = '', regexPattern = null) {
     const files = [];
 
-    // Load gitignore patterns from current directory if not provided
-    if (gitignorePatterns === null) {
-        const gitignorePath = path.join(process.cwd(), '.gitignore');
-        gitignorePatterns = parseGitignore(gitignorePath);
-    }
+    // Compile regex pattern if provided
+    const fileRegex = regexPattern ? new RegExp(regexPattern) : null;
 
     const entries = fs.readdirSync(dir);
 
@@ -101,16 +41,14 @@ function getLocalFiles(dir = process.cwd(), relativePath = '', gitignorePatterns
             continue;
         }
 
-        // Skip gitignored files
-        if (isIgnored(relativeFilePath, gitignorePatterns)) {
-            continue;
-        }
-
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
-            files.push(...getLocalFiles(fullPath, relativeFilePath, gitignorePatterns));
+            files.push(...getLocalFiles(fullPath, relativeFilePath, regexPattern));
         } else if (stat.isFile()) {
-            files.push(relativeFilePath);
+            // Include the file only if it matches the regex or if no regex is provided
+            if (!fileRegex || fileRegex.test(relativeFilePath)) {
+                files.push(relativeFilePath);
+            }
         }
     }
 
@@ -231,6 +169,28 @@ function uploadFile(filename, kbdirId) {
     });
 }
 
+// Helper: remove file from knowledge base (first from collection, then from storage)
+async function removeFileFromKnowledgeBase(fileId) {
+    try {
+        // First remove from knowledge collection
+        console.log(`Removing file ${fileId} from knowledge collection...`);
+        const removeUrl = `/api/v1/knowledge/${knowledgeBaseId}/file/remove`;
+        const kbremoveresponse = await httpRequest('POST', removeUrl, {'file_id': fileId});
+        if (!kbremoveresponse?.id) {
+            console.error(`Failed to remove file from knowledge collection.`);
+            console.error('Remove response:', JSON.stringify(kbremoveresponse, null, 2));
+        }
+
+        // Then delete from file storage seems already done, so we can skip this step:
+        // console.log(`Deleting file ${fileId} from file storage...`);
+        // const deleteUrl = `/api/v1/files/${fileId}`;
+        // const remfileresponse = await httpRequest('DELETE', deleteUrl);
+    } catch (error) {
+        console.error(`Error deleting file ${fileId}:`, error.message);
+        throw error;
+    }
+}
+
 function listKnowledgeBases() {
     httpRequest('GET', '/api/v1/knowledge/')
         .then(json => {
@@ -260,23 +220,33 @@ async function syncKnowledgeBase() {
     try {
         console.log('Starting knowledge base synchronization...');
 
-        // 1. Get local files and their hashes
-        const localFiles = getLocalFiles();
+        // 1. Get local files and their hashes - now using fileRegex
+        const localFiles = getLocalFiles(process.cwd(), '', fileRegex);
         const localHashes = {};
         for (const filename of localFiles) {
             localHashes[filename] = fileHash(filename);
         }
-        console.log(`Found ${localFiles.length} local files`);
+        console.log(`Found ${localFiles.length} local files.`);
 
         // 2. Get current knowledge base state
         const kbData = await httpRequest('GET', `/api/v1/knowledge/${knowledgeBaseId}`);
         const kbFiles = kbData.files || [];
-        console.log(`Knowledge base contains ${kbFiles.length} files`);
+        console.log(`Knowledge base contains ${kbFiles.length} files.`);
+
+        // Debug: log KB files with their decoded names
+        if (debug) {
+            console.log('Knowledge base files:');
+            kbFiles.forEach(file => {
+                const decodedName = decodeFilename(file.meta.name, kbdirId);
+                console.log(`- ${file.id}: ${file.meta.name} -> ${decodedName}`);
+            });
+        }
 
         // 3. Get all files to find hash information and build maps for reuse
         const allFiles = await httpRequest('GET', '/api/v1/files/');
         const fileHashMap = {};
         const fileByNameAndHash = new Map(); // Map for reusing existing files
+        const fileIdByDecodedName = new Map(); // Map to track file IDs by decoded name
 
         for (const file of allFiles) {
             if (file.hash) {
@@ -284,6 +254,8 @@ async function syncKnowledgeBase() {
                 const decodedName = decodeFilename(file.meta.name, kbdirId);
                 if (decodedName !== null) {
                     fileHashMap[decodedName] = file.hash;
+                    fileIdByDecodedName.set(decodedName, file.id);
+                    if (debug) console.log(`Remote file mapping: "${decodedName}" -> ${file.id} (hash: ${file.hash})`);
                 }
 
                 // Also build map for all files by name and hash for reuse
@@ -293,6 +265,7 @@ async function syncKnowledgeBase() {
         }
 
         // 4. Delete files from KB that belong to our kbdir_id but don't exist locally or have different hashes
+        if (debug) console.log('\nChecking for files to delete:');
         for (const kbFile of kbFiles) {
             // Decode filename and check if it belongs to our directory
             const filename = decodeFilename(kbFile.meta.name, kbdirId);
@@ -301,27 +274,56 @@ async function syncKnowledgeBase() {
                 const localHash = localHashes[filename];
                 const remoteHash = fileHashMap[filename];
 
-                if (!localHash) {
+                if (debug) {
+                    console.log(`\nEvaluating KB file: ${filename}`);
+                    console.log(`- Local hash: ${localHash || 'NOT FOUND LOCALLY'}`);
+                    console.log(`- Remote hash: ${remoteHash || 'UNKNOWN'}`);
+                    console.log(`- In local files list: ${localFiles.includes(filename) ? 'YES' : 'NO'}`);
+                }
+
+                if (!localFiles.includes(filename)) {
                     // File doesn't exist locally anymore - delete it
                     console.log(`Deleting file from knowledge base (no longer exists locally): ${filename}`);
-                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
+                    await removeFileFromKnowledgeBase(kbFile.id);
                 } else if (localHash !== remoteHash) {
                     // File exists but has different hash - delete old version
                     console.log(`Deleting file from knowledge base (content changed): ${filename}`);
-                    await httpRequest('DELETE', `/api/v1/files/${kbFile.id}`);
+                    await removeFileFromKnowledgeBase(kbFile.id);
+                } else {
+                    console.log(`Keeping file (unchanged): ${filename}`);
                 }
                 // If localHash === remoteHash, file is up to date, keep it
+            } else {
+                console.log(`Skipping non-directory file: ${kbFile.meta.name}`);
             }
             // If filename is null, this file doesn't belong to our directory, leave it alone
         }
 
         // 5. Upload and add new/changed files
+        if (debug) console.log('\nChecking for files to add or update:');
         for (const filename of localFiles) {
             const localHash = localHashes[filename];
             const remoteHash = fileHashMap[filename];
 
+            if (debug) {
+                console.log(`\nProcessing local file: ${filename}`);
+                console.log(`- Local hash: ${localHash}`);
+                console.log(`- Remote hash: ${remoteHash || 'NOT IN KB'}`);
+            }
+
+            // Check if this file is already in the knowledge base with the correct content
+            const fileInKb = kbFiles.some(f => {
+                const decodedName = decodeFilename(f.meta.name, kbdirId);
+                return decodedName === filename;
+            });
+
+            if (debug) {
+                console.log(`- Already in knowledge base: ${fileInKb ? 'YES' : 'NO'}`);
+                console.log(`- Hash match: ${localHash === remoteHash ? 'YES' : 'NO'}`);
+            }
+
             // Check if file needs to be uploaded
-            if (localHash !== remoteHash) {
+            if (!fileInKb || localHash !== remoteHash) {
                 let fileId = null;
                 const encodedFilename = encodeFilename(filename, kbdirId);
                 const reuseKey = `${encodedFilename}:${localHash}`;
@@ -377,32 +379,7 @@ async function syncKnowledgeBase() {
                     }
                 }
             } else {
-                // File exists with same hash - check if it's in the knowledge base
-                const inKb = kbFiles.some(f => {
-                    const decodedName = decodeFilename(f.meta.name, kbdirId);
-                    return decodedName === filename;
-                });
-                if (!inKb) {
-                    // Find existing file and add to KB
-                    const existingFile = allFiles.find(f => {
-                        const decodedName = decodeFilename(f.meta.name, kbdirId);
-                        return decodedName === filename && f.hash === localHash;
-                    });
-                    if (existingFile) {
-                        console.log(`Adding existing file to knowledge base: ${filename}`);
-                        const addResult = await httpRequest('POST', `/api/v1/knowledge/${knowledgeBaseId}/file/add`, {
-                            file_id: existingFile.id
-                        });
-
-                        // Check if adding was successful
-                        if (!addResult || (!addResult.id && !addResult.file_id && !addResult.success)) {
-                            console.error(`Failed to add existing file to knowledge base: ${filename}`);
-                            console.error('Add response:', JSON.stringify(addResult, null, 2));
-                        } else {
-                            console.log(`Existing file added to knowledge base successfully: ${filename}`);
-                        }
-                    }
-                }
+                console.log(`Skipping file (unchanged and already in KB): ${filename}`);
             }
         }
 
@@ -441,6 +418,7 @@ const knowledgeBaseId = config.knowledge_base_id;
 const openWebuiApiKey = config.open_webui_api_key;
 const openWebuiApiUrl = config.open_webui_api_url || 'http://localhost:3000';
 const kbdirId = config.kbdir_id;
+const fileRegex = config.fileregex; // Add fileregex from config
 
 // call functions based on command
 if (command === 'sync') {

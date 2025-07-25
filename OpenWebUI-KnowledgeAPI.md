@@ -74,9 +74,12 @@ response = requests.post(url, headers=headers, json=data)
 return response.json() 
 ```
 
-## Delete a file from file storage and knowledge collections
+## Delete a file from file storage
 
-curl -X DELETE -H "Authorization: Bearer XXX" -H "Accept: application/json" http://localhost:3000/api/v1/files/{fileid} | jq
+When deleting it from the knowledge collection this seems unneccessary - the file is deleted from the storage automatically.
+
+    curl -X DELETE -H "Authorization: Bearer XXX" -H "Accept: application/json" http://localhost:3000/api/v1/files/{fileid} | jq
+
 
 ## List Knowledge Collections
 
@@ -116,4 +119,19 @@ Result (some parts omitted for brevity):
     }
   ]
 }
+```
+
+## Removing Files from Knowledge Collections
+
+To remove a file from a knowledge collection:
+
+Endpoint: POST /api/v1/knowledge/{knowledge_id}/file/remove
+
+Curl Example:
+
+```shell
+curl -X POST http://localhost:3000/api/v1/knowledge/{knowledge_id}/file/remove \
+-H "Authorization: Bearer YOUR_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{"file_id": "your-file-id-here"}'
 ```
