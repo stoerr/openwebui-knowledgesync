@@ -27,6 +27,6 @@ fileregex=<regex for files to be included>
 - When deleting a file it must be first deleted from the knowledge collection .
 - At sync start, a list of all files is fetched from OpenWebUI. Before uploading a file we check whether a file with the
   same name and sha256 hash as the file to be uploaded already exists. If so, the file is not uploaded again, but the
-  file id is used to add the file to the knowledge collection.‚
+  file id is used to add the file to the knowledge collection.
 - Files starting with . are ignored.
 - Only files matching the fileregex are included.

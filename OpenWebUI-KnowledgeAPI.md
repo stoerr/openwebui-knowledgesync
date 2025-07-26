@@ -15,10 +15,26 @@ curl -X POST -H "Authorization: Bearer YOUR_API_KEY" -H "Accept: application/jso
 -F "file=@path/to/your/file;filename=path%%to%%your%%file" http://localhost:3000/api/v1/files/
 ```
 
-Sample run:
-```
-curl -X POST -H "Authorization: Bearer sk-1084097265804661907951d6be1ac8d1" -H "Accept: application/json" -F "file=@x/knowledgetest.txt" http://localhost:3000/api/v1/files/
-{"id":"2ec72510-cfc3-4d5c-babf-a30bd4d9d976","user_id":"426b5aea-7079-499f-b139-5471c33aeecd","hash":"36bb78f0cb9466315a1bdd13e7cde298d4ce33faac6c175b39bb9f1414f38799","filename":"knowledgetest.txt","data":{"content":"Ein Hubbu ist ein grosses Auto.\n"},"meta":{"name":"knowledgetest.txt","content_type":"text/plain","size":32,"data":{},"collection_name":"file-2ec72510-cfc3-4d5c-babf-a30bd4d9d976"},"created_at":1753170693,"updated_at":1753170693}~/Downloads>
+Sample response (successful upload):
+```json
+{
+    "id": "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "ad06c71227e1abc978387e98b3af4739bade2b0735ca1764432aa166f383a79e",
+    "filename": "knowledgetest.txt",
+    "data": {
+        "content": "Ein Hubbu ist ein grosses blaues Auto.\n"
+    },
+    "meta": {
+        "name": "knowledgetest.txt",
+        "content_type": "text/plain",
+        "size": 39,
+        "data": {},
+        "collection_name": "file-7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"
+    },
+    "created_at": 1753516524,
+    "updated_at": 1753516524
+}
 ```
 
 Python Example:
@@ -56,6 +72,36 @@ curl -X POST http://localhost:3000/api/v1/knowledge/{knowledge_id}/file/add \
 -H "Authorization: Bearer YOUR_API_KEY" \
 -H "Content-Type: application/json" \
 -d '{"file_id": "your-file-id-here"}'
+```
+
+Sample response (successful addition):
+```json
+{
+    "id": "e117962a-7560-468b-a83e-35e0005aa515",
+    "name": "ksync test",
+    "description": "test data for knowledge sync",
+    "data": {
+        "file_ids": [
+            "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"
+        ]
+    },
+    "created_at": 1753378934,
+    "updated_at": 1753516524,
+    "files": [
+        {
+            "id": "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb",
+            "meta": {
+                "name": "knowledgetest.txt",
+                "content_type": "text/plain",
+                "size": 39,
+                "data": {},
+                "collection_name": "e117962a-7560-468b-a83e-35e0005aa515"
+            },
+            "created_at": 1753516524,
+            "updated_at": 1753516524
+        }
+    ]
+}
 ```
 
 Python Example:
@@ -135,3 +181,60 @@ curl -X POST http://localhost:3000/api/v1/knowledge/{knowledge_id}/file/remove \
 -H "Content-Type: application/json" \
 -d '{"file_id": "your-file-id-here"}'
 ```
+
+Sample response (successful removal):
+```json
+{
+    "id": "e117962a-7560-468b-a83e-35e0005aa515",
+    "name": "ksync test",
+    "description": "test data for knowledge sync",
+    "data": {
+        "file_ids": []
+    },
+    "created_at": 1753378934,
+    "updated_at": 1753516528,
+    "files": []
+}
+```
+
+## Downloading File Content
+
+To download the actual content of an uploaded file:
+
+Endpoint: GET /api/v1/files/{file_id}/content
+
+Curl Example:
+
+```shell
+curl -X GET -H "Authorization: Bearer YOUR_API_KEY" \
+http://localhost:3000/api/v1/files/{file_id}/content
+```
+
+This endpoint returns the raw file content directly (not JSON). The response will have the original file content with appropriate content-type headers.
+
+Python Example:
+
+```python
+import requests
+
+def download_file(token, file_id):
+    url = f'http://localhost:3000/api/v1/files/{file_id}/content'
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.content
+    else:
+        raise Exception(f'Download failed: {response.status_code}')
+```
+
+## API Response Validation
+
+When using the API programmatically, always check that responses contain the expected `id` field to ensure operations completed successfully:
+
+- **File Upload**: Check for `response.id` to confirm file was uploaded
+- **Add to Knowledge Base**: Check for `response.id` to confirm file was added to collection
+- **Remove from Knowledge Base**: Check for `response.id` to confirm file was removed from collection
+
+If the `id` field is missing, the operation likely failed and you should examine the full response for error details.

@@ -7,7 +7,7 @@ const {URL} = require('url');
 const http = require('http');
 const https = require('https');
 
-const debug = true; // Set to true for debug output
+const debug = false; // Set to true for debug output
 
 /* Prints usage: commands are listkb, listfiles */
 function usage() {
@@ -19,6 +19,7 @@ function usage() {
     console.log('  listkb       List knowledge bases');
     console.log('  listfiles    List all files');
     console.log('  listkbfiles  List files in a knowledge base');
+    console.log('  download <fileid>  Download a file from the knowledge base by its ID and write it to stdout');
 }
 
 // Helper: get all files matching fileregex recursively (excluding config, script)
@@ -61,14 +62,14 @@ function fileHash(filename) {
     return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-// Helper: make HTTP request returning JSON
-function httpRequest(method, apiPath, body = null, contentType = 'application/json') {
+// Helper: make HTTP request returning JSON or raw data
+function httpRequest(method, apiPath, body = null, contentType = 'application/json', parseJson = true) {
     return new Promise((resolve, reject) => {
         const url = new URL(apiPath, openWebuiApiUrl);
         const lib = url.protocol === 'https:' ? https : http;
         const headers = {
             'Authorization': `Bearer ${openWebuiApiKey}`,
-            'Accept': 'application/json'
+            'Accept': parseJson ? 'application/json' : '*/*'
         };
 
         if (contentType) headers['Content-Type'] = contentType;
@@ -86,6 +87,18 @@ function httpRequest(method, apiPath, body = null, contentType = 'application/js
         };
 
         const req = lib.request(options, res => {
+            if (!parseJson) {
+                // For non-JSON responses (like file downloads), pipe directly to stdout
+                if (res.statusCode !== 200) {
+                    console.error(`HTTP ${res.statusCode}: ${res.statusMessage}`);
+                    process.exit(1);
+                }
+                res.pipe(process.stdout);
+                res.on('end', () => resolve());
+                return;
+            }
+
+            // For JSON responses
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
@@ -344,6 +357,14 @@ async function syncKnowledgeBase() {
                         continue; // Skip this file
                     }
 
+                    // Verify that the uploaded file's hash matches the local file's hash
+                    if (uploadResult.hash && uploadResult.hash !== localHash) {
+                        console.error(`Hash mismatch for uploaded file ${filename}:`);
+                        console.error(`  Local hash:    ${localHash}`);
+                        console.error(`  Uploaded hash: ${uploadResult.hash}`);
+                        console.error('This may indicate upload corruption or file processing issues - is that actually UTF-8?');
+                        // Continue with the process but log the issue
+                    }
                     fileId = uploadResult.id;
                     console.log(`File uploaded successfully: ${filename} (${fileId})`);
                 }
@@ -386,6 +407,15 @@ async function syncKnowledgeBase() {
         console.log('Synchronization completed successfully!');
     } catch (error) {
         console.error('Synchronization failed:', error.message || error);
+        process.exit(1);
+    }
+}
+
+async function downloadFile(fileId) {
+    try {
+        await httpRequest('GET', `/api/v1/files/${fileId}/content`, null, null, false);
+    } catch (error) {
+        console.error(`Error downloading file ${fileId}:`, error.message);
         process.exit(1);
     }
 }
@@ -441,6 +471,13 @@ if (command === 'sync') {
         process.exit(1);
     }
     listFilesInKnowledgeBase(knowledgeBaseId);
+} else if (command === 'download' && args.length === 2) {
+    const fileId = args[1];
+    if (!fileId) {
+        console.error('File ID is required for download command.');
+        process.exit(1);
+    }
+    downloadFile(fileId);
 } else {
     usage();
     process.exit(1);
