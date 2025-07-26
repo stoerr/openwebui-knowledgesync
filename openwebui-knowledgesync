@@ -356,7 +356,7 @@ async function syncKnowledgeBase() {
                     });
 
                     // Check if adding to knowledge base was successful
-                    if (!addResult || (!addResult.id && !addResult.file_id && !addResult.success)) {
+                    if (!addResult?.id) {
                         console.error(`Failed to add file to knowledge base: ${filename}`);
                         console.error('Add response:', JSON.stringify(addResult, null, 2));
 

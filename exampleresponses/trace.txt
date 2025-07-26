@@ -1,0 +1,114 @@
+# Traced from OpenWebUI in browser (authorization token etc. omitted)
+
+## Upload: 1. Upload a file to the knowledge base
+
+curl 'http://localhost:3000/api/v1/files/' \
+-H 'Accept: application/json' \
+-H 'Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryIBUSoIUpPSi0XN52' \
+--data-raw $'------WebKitFormBoundaryIBUSoIUpPSi0XN52\r\nContent-Disposition: form-data; name="file"; filename="knowledgetest.txt"\r\nContent-Type: text/plain\r\n\r\n\r\n------WebKitFormBoundaryIBUSoIUpPSi0XN52--\r\n'
+
+==> Response
+
+{
+    "id": "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "hash": "ad06c71227e1abc978387e98b3af4739bade2b0735ca1764432aa166f383a79e",
+    "filename": "knowledgetest.txt",
+    "data": {
+        "content": "Ein Hubbu ist ein grosses blaues Auto.\n"
+    },
+    "meta": {
+        "name": "knowledgetest.txt",
+        "content_type": "text/plain",
+        "size": 39,
+        "data": {},
+        "collection_name": "file-7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"
+    },
+    "created_at": 1753516524,
+    "updated_at": 1753516524
+}
+
+## Add file to knowledge base
+
+curl 'http://localhost:3000/api/v1/knowledge/e117962a-7560-468b-a83e-35e0005aa515/file/add' \
+-H 'Accept: application/json' \
+-H 'Content-Type: application/json' \
+--data-raw '{"file_id":"7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"}'
+
+==> Response
+
+{
+    "id": "e117962a-7560-468b-a83e-35e0005aa515",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "name": "ksync test",
+    "description": "test data for knowledge sync",
+    "data": {
+        "file_ids": [
+            "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"
+        ]
+    },
+    "meta": null,
+    "access_control": {
+        "read": {
+            "group_ids": [],
+            "user_ids": []
+        },
+        "write": {
+            "group_ids": [],
+            "user_ids": []
+        }
+    },
+    "created_at": 1753378934,
+    "updated_at": 1753516524,
+    "files": [
+        {
+            "id": "7fcf9108-d769-4ce5-bf0f-5b57c3462ebb",
+            "meta": {
+                "name": "knowledgetest.txt",
+                "content_type": "text/plain",
+                "size": 39,
+                "data": {},
+                "collection_name": "e117962a-7560-468b-a83e-35e0005aa515"
+            },
+            "created_at": 1753516524,
+            "updated_at": 1753516524
+        }
+    ]
+}
+
+## Download a file
+
+http://localhost:3000/api/v1/files/7fcf9108-d769-4ce5-bf0f-5b57c3462ebb/content
+
+## Remove file from knowledge base
+
+curl 'http://localhost:3000/api/v1/knowledge/e117962a-7560-468b-a83e-35e0005aa515/file/remove' \
+-H 'Accept: application/json' \
+-H 'Content-Type: application/json' \
+--data-raw '{"file_id":"7fcf9108-d769-4ce5-bf0f-5b57c3462ebb"}'
+
+==> Response
+
+{
+    "id": "e117962a-7560-468b-a83e-35e0005aa515",
+    "user_id": "426b5aea-7079-499f-b139-5471c33aeecd",
+    "name": "ksync test",
+    "description": "test data for knowledge sync",
+    "data": {
+        "file_ids": []
+    },
+    "meta": null,
+    "access_control": {
+        "read": {
+            "group_ids": [],
+            "user_ids": []
+        },
+        "write": {
+            "group_ids": [],
+            "user_ids": []
+        }
+    },
+    "created_at": 1753378934,
+    "updated_at": 1753516528,
+    "files": []
+}
